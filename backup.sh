@@ -11,11 +11,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 source "$CONFIG_FILE"
 
-# Defaults
-ICLOUDPD_BIN="${ICLOUDPD_BIN:-/home/tomklaasen/.local/bin/icloudpd}"
-BACKUP_DIR="${BACKUP_DIR:-/mnt/usb/icloud_photos_backup}"
-USERNAME="${USERNAME:-tomk@tomk.be}"
-UNTIL_FOUND="${UNTIL_FOUND:-500}"
+# Defaults for optional settings
 SHARED_LIBRARY="${SHARED_LIBRARY:-}"
 LOG_FILE="${LOG_FILE:-}"
 LOG_MAX_SIZE_KB="${LOG_MAX_SIZE_KB:-10240}"
@@ -83,37 +79,57 @@ hc_ping start
 
 failed=0
 summary=""
+total_new=0
+tmpout=$(mktemp)
+trap 'rm -f "$tmpout"' EXIT
+
+# Count new downloads from icloudpd output.
+# icloudpd logs "Downloading /path/to/file" for each new file (distinct from
+# the summary line "Downloading ??? original photos and videos to ...").
+count_new_downloads() {
+    grep -c 'Downloading /' "$tmpout" 2>/dev/null || true
+}
 
 # --- Shared library backup ---
+shared_new=0
 if [[ -n "$SHARED_LIBRARY" ]]; then
     log "Running shared library backup (library: $SHARED_LIBRARY)..."
-    if "$ICLOUDPD_BIN" -d "$BACKUP_DIR" --username "$USERNAME" --until-found "$UNTIL_FOUND" --library="$SHARED_LIBRARY" 2>&1; then
-        log "Shared library backup completed successfully."
-        summary+="Shared library: OK"
+    if "$ICLOUDPD_BIN" -d "$BACKUP_DIR" --username "$USERNAME" --until-found "$UNTIL_FOUND" --library="$SHARED_LIBRARY" 2>&1 | tee "$tmpout"; then
+        shared_new=$(count_new_downloads)
+        log "Shared library backup completed successfully. New photos: $shared_new"
+        summary+="Shared library: OK ($shared_new new)"
     else
-        log "ERROR: Shared library backup failed (exit code: $?)."
-        summary+="Shared library: FAILED"
+        shared_new=$(count_new_downloads)
+        log "ERROR: Shared library backup failed (exit code: ${PIPESTATUS[0]}). New photos before failure: $shared_new"
+        summary+="Shared library: FAILED ($shared_new new)"
         failed=$((failed + 1))
     fi
+    total_new=$((total_new + shared_new))
 else
     log "Skipping shared library backup (SHARED_LIBRARY not set)."
 fi
 
 # --- Personal library backup ---
+personal_new=0
 log "Running personal library backup..."
-if "$ICLOUDPD_BIN" -d "$BACKUP_DIR" --username "$USERNAME" --until-found "$UNTIL_FOUND" 2>&1; then
-    log "Personal library backup completed successfully."
-    summary+=", Personal library: OK"
+if "$ICLOUDPD_BIN" -d "$BACKUP_DIR" --username "$USERNAME" --until-found "$UNTIL_FOUND" 2>&1 | tee "$tmpout"; then
+    personal_new=$(count_new_downloads)
+    log "Personal library backup completed successfully. New photos: $personal_new"
+    summary+=", Personal library: OK ($personal_new new)"
 else
-    log "ERROR: Personal library backup failed (exit code: $?)."
-    summary+=", Personal library: FAILED"
+    personal_new=$(count_new_downloads)
+    log "ERROR: Personal library backup failed (exit code: ${PIPESTATUS[0]}). New photos before failure: $personal_new"
+    summary+=", Personal library: FAILED ($personal_new new)"
     failed=$((failed + 1))
 fi
+total_new=$((total_new + personal_new))
 
 # --- Summary ---
 echo
 log "===== Backup complete ====="
 log "$summary"
+log "Total new photos: $total_new"
+summary+=$'\n'"Total new photos: $total_new"
 
 if (( failed > 0 )); then
     hc_ping fail "$summary"

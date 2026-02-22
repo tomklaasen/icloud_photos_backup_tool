@@ -84,7 +84,7 @@ if [[ -f "$session_file" ]]; then
     session_age_sec=$(( $(date +%s) - $(stat --format='%Y' "$session_file") ))
     session_age_days=$(( session_age_sec / 86400 ))
     if (( session_age_days >= SESSION_MAX_AGE_DAYS )); then
-        msg="Skipped: session expired (last refreshed ${session_age_days} days ago). Re-authenticate with: $ICLOUDPD_BIN --auth-only --username $USERNAME --cookie-directory $COOKIE_DIRECTORY"
+        msg="Skipped: session expired (last refreshed ${session_age_days} days ago). Re-authenticate with: $SCRIPT_DIR/reauth.sh"
         log "$msg"
         hc_ping fail "$msg"
         exit 0

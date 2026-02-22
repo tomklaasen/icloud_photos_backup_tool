@@ -35,7 +35,7 @@ All settings live in `backup.conf` (git-ignored). See `backup.conf.example` for 
 
 ## What it does
 
-1. Checks session freshness — if the icloudpd session cookie is older than `SESSION_MAX_AGE_DAYS`, the backup is skipped entirely to avoid triggering MFA push notifications on your phone. A `/fail` ping is sent with instructions to re-authenticate.
+1. Checks session freshness — if the icloudpd session cookie is older than `SESSION_MAX_AGE_DAYS`, the backup is skipped entirely to avoid triggering MFA push notifications on your phone. A `/fail` ping is sent with instructions to re-authenticate via `reauth.sh`.
 2. Pings healthchecks.io `/start`
 3. Runs shared library backup (if `SHARED_LIBRARY` is set)
 4. Runs personal library backup
@@ -45,3 +45,11 @@ The summary sent to healthchecks.io includes:
 - Per-library status (OK/FAILED) and count of newly downloaded photos
 - Total new photos across both libraries
 - Date of the most recent photo in the backup (derived from the `YYYY/MM/DD` directory structure)
+
+## Re-authentication
+
+When the iCloud session expires, run:
+```sh
+./reauth.sh
+```
+This will prompt for MFA and refresh the session cookie. The next scheduled backup will then proceed normally.

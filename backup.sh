@@ -124,12 +124,20 @@ else
 fi
 total_new=$((total_new + personal_new))
 
+# --- Most recent photo date ---
+latest_photo_date=$(find "$BACKUP_DIR" -mindepth 3 -maxdepth 3 -type d | sort -r | head -1 | grep -oP '\d{4}/\d{2}/\d{2}$' || true)
+if [[ -n "$latest_photo_date" ]]; then
+    latest_photo_date="${latest_photo_date//\//-}"
+fi
+
 # --- Summary ---
 echo
 log "===== Backup complete ====="
 log "$summary"
 log "Total new photos: $total_new"
+log "Most recent photo: $latest_photo_date"
 summary+=$'\n'"Total new photos: $total_new"
+summary+=$'\n'"Most recent photo: $latest_photo_date"
 
 if (( failed > 0 )); then
     hc_ping fail "$summary"

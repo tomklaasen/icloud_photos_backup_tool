@@ -9,5 +9,9 @@ LOG_FILE="/mnt/usb/icloud_photos_backup_tool/cron.log"
 LOG_MAX_SIZE_KB="10240"
 LOG_KEEP="5"
 
+# Session — skip backup if session cookie is older than this (avoids MFA prompts)
+COOKIE_DIRECTORY="$HOME/.pyicloud"
+SESSION_MAX_AGE_DAYS="14"
+
 # Healthchecks.io
 HC_PING_URL="https://hc-ping.com/YOUR-UUID-HERE"

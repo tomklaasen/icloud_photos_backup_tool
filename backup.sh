@@ -13,6 +13,8 @@ source "$CONFIG_FILE"
 
 # Defaults for optional settings
 SHARED_LIBRARY="${SHARED_LIBRARY:-}"
+COOKIE_DIRECTORY="${COOKIE_DIRECTORY:-$HOME/.pyicloud}"
+SESSION_MAX_AGE_DAYS="${SESSION_MAX_AGE_DAYS:-14}"
 LOG_FILE="${LOG_FILE:-}"
 LOG_MAX_SIZE_KB="${LOG_MAX_SIZE_KB:-10240}"
 LOG_KEEP="${LOG_KEEP:-5}"
@@ -73,6 +75,27 @@ fi
 
 mkdir -p "$BACKUP_DIR"
 
+# --- Check session freshness ---
+# icloudpd stores session files as <username_without_punctuation>.session
+# in the cookie directory. If the session file is older than SESSION_MAX_AGE_DAYS,
+# skip the backup to avoid triggering MFA push notifications.
+session_file="$COOKIE_DIRECTORY/$(echo "$USERNAME" | tr -d '.@').session"
+if [[ -f "$session_file" ]]; then
+    session_age_sec=$(( $(date +%s) - $(stat --format='%Y' "$session_file") ))
+    session_age_days=$(( session_age_sec / 86400 ))
+    if (( session_age_days >= SESSION_MAX_AGE_DAYS )); then
+        msg="Skipped: session expired (last refreshed ${session_age_days} days ago). Re-authenticate with: $ICLOUDPD_BIN --auth-only --username $USERNAME --cookie-directory $COOKIE_DIRECTORY"
+        log "$msg"
+        hc_ping fail "$msg"
+        exit 0
+    fi
+else
+    msg="Skipped: session file not found at $session_file. Authenticate with: $ICLOUDPD_BIN --auth-only --username $USERNAME --cookie-directory $COOKIE_DIRECTORY"
+    log "$msg"
+    hc_ping fail "$msg"
+    exit 0
+fi
+
 # --- Start ---
 log "===== iCloud Photos backup starting ====="
 hc_ping start
@@ -94,7 +117,7 @@ count_new_downloads() {
 shared_new=0
 if [[ -n "$SHARED_LIBRARY" ]]; then
     log "Running shared library backup (library: $SHARED_LIBRARY)..."
-    if "$ICLOUDPD_BIN" -d "$BACKUP_DIR" --username "$USERNAME" --until-found "$UNTIL_FOUND" --library="$SHARED_LIBRARY" 2>&1 | tee "$tmpout"; then
+    if "$ICLOUDPD_BIN" -d "$BACKUP_DIR" --username "$USERNAME" --until-found "$UNTIL_FOUND" --cookie-directory "$COOKIE_DIRECTORY" --library="$SHARED_LIBRARY" 2>&1 | tee "$tmpout"; then
         shared_new=$(count_new_downloads)
         log "Shared library backup completed successfully. New photos: $shared_new"
         summary+="Shared library: OK ($shared_new new)"
@@ -112,7 +135,7 @@ fi
 # --- Personal library backup ---
 personal_new=0
 log "Running personal library backup..."
-if "$ICLOUDPD_BIN" -d "$BACKUP_DIR" --username "$USERNAME" --until-found "$UNTIL_FOUND" 2>&1 | tee "$tmpout"; then
+if "$ICLOUDPD_BIN" -d "$BACKUP_DIR" --username "$USERNAME" --until-found "$UNTIL_FOUND" --cookie-directory "$COOKIE_DIRECTORY" 2>&1 | tee "$tmpout"; then
     personal_new=$(count_new_downloads)
     log "Personal library backup completed successfully. New photos: $personal_new"
     summary+=", Personal library: OK ($personal_new new)"

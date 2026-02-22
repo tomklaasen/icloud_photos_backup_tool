@@ -26,6 +26,8 @@ All settings live in `backup.conf` (git-ignored). See `backup.conf.example` for 
 | `USERNAME` | yes | iCloud username |
 | `UNTIL_FOUND` | yes | Stop after N consecutive already-downloaded photos |
 | `SHARED_LIBRARY` | no | iCloud shared library ID (omit to skip shared backup) |
+| `COOKIE_DIRECTORY` | no | icloudpd session/cookie directory (default: `~/.pyicloud`) |
+| `SESSION_MAX_AGE_DAYS` | no | Max session age in days before skipping backup (default: 14) |
 | `LOG_FILE` | no | Path to log file (omit to log to stdout) |
 | `LOG_MAX_SIZE_KB` | no | Log rotation threshold in KB (default: 10240) |
 | `LOG_KEEP` | no | Number of rotated log files to keep (default: 5) |
@@ -33,10 +35,11 @@ All settings live in `backup.conf` (git-ignored). See `backup.conf.example` for 
 
 ## What it does
 
-1. Pings healthchecks.io `/start`
-2. Runs shared library backup (if `SHARED_LIBRARY` is set)
-3. Runs personal library backup
-4. Pings healthchecks.io with a summary or `/fail` on error
+1. Checks session freshness — if the icloudpd session cookie is older than `SESSION_MAX_AGE_DAYS`, the backup is skipped entirely to avoid triggering MFA push notifications on your phone. A `/fail` ping is sent with instructions to re-authenticate.
+2. Pings healthchecks.io `/start`
+3. Runs shared library backup (if `SHARED_LIBRARY` is set)
+4. Runs personal library backup
+5. Pings healthchecks.io with a summary or `/fail` on error
 
 The summary sent to healthchecks.io includes:
 - Per-library status (OK/FAILED) and count of newly downloaded photos

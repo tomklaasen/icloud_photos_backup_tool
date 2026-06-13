@@ -53,3 +53,15 @@ When the iCloud session expires, run:
 ./reauth.sh
 ```
 This will prompt for MFA and refresh the session cookie. The next scheduled backup will then proceed normally.
+
+### Troubleshooting: no 2FA push arrives
+
+If `reauth.sh` reaches the `Please enter two-factor authentication code:` prompt but no push notification arrives on your trusted Apple devices, you are likely on an icloudpd build that predates the 2FA push fix (the 1.32.2 PyPI release and master HEAD as of 2026-05 both have this bug). Upgrade to the latest master, clear the stale session, and try again:
+
+```sh
+pipx install --force git+https://github.com/icloud-photos-downloader/icloud_photos_downloader.git@master
+rm ~/.pyicloud/<username_no_punctuation> ~/.pyicloud/<username_no_punctuation>.session
+./reauth.sh
+```
+
+A working build logs `2FA push notification triggered` and offers an SMS fallback in the prompt (`device index (a) to send SMS with a code`).

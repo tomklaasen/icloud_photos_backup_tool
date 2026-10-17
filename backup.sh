@@ -132,8 +132,9 @@ if [[ -n "$SHARED_LIBRARY" ]]; then
         log "Shared library backup completed successfully. New photos: $shared_new"
         summary+="Shared library: OK ($shared_new new)"
     else
+        rc=${PIPESTATUS[0]}
         shared_new=$(count_new_downloads)
-        log "ERROR: Shared library backup failed (exit code: ${PIPESTATUS[0]}). New photos before failure: $shared_new"
+        log "ERROR: Shared library backup failed (exit code: $rc). New photos before failure: $shared_new"
         summary+="Shared library: FAILED ($shared_new new)"
         collect_failure_log "Shared library"
         failed=$((failed + 1))
@@ -151,8 +152,9 @@ if "$ICLOUDPD_BIN" -d "$BACKUP_DIR" --username "$USERNAME" --until-found "$UNTIL
     log "Personal library backup completed successfully. New photos: $personal_new"
     summary+=", Personal library: OK ($personal_new new)"
 else
+    rc=${PIPESTATUS[0]}
     personal_new=$(count_new_downloads)
-    log "ERROR: Personal library backup failed (exit code: ${PIPESTATUS[0]}). New photos before failure: $personal_new"
+    log "ERROR: Personal library backup failed (exit code: $rc). New photos before failure: $personal_new"
     summary+=", Personal library: FAILED ($personal_new new)"
     collect_failure_log "Personal library"
     failed=$((failed + 1))

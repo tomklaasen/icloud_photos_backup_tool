@@ -32,6 +32,7 @@ All settings live in `backup.conf` (git-ignored). See `backup.conf.example` for 
 | `LOG_MAX_SIZE_KB` | no | Log rotation threshold in KB (default: 10240) |
 | `LOG_KEEP` | no | Number of rotated log files to keep (default: 5) |
 | `HC_PING_URL` | no | Healthchecks.io ping URL (omit to disable monitoring) |
+| `HC_LOG_LINES` | no | Number of trailing icloudpd output lines per failed library to include in the `/fail` ping (default: 50) |
 
 ## What it does
 
@@ -45,6 +46,7 @@ The summary sent to healthchecks.io includes:
 - Per-library status (OK/FAILED) and count of newly downloaded photos
 - Total new photos across both libraries
 - Date of the most recent photo in the backup (derived from the `YYYY/MM/DD` directory structure)
+- On failure: the last `HC_LOG_LINES` lines of icloudpd output for each failed library
 
 ## Re-authentication
 

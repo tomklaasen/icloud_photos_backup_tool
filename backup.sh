@@ -19,6 +19,7 @@ LOG_FILE="${LOG_FILE:-}"
 LOG_MAX_SIZE_KB="${LOG_MAX_SIZE_KB:-10240}"
 LOG_KEEP="${LOG_KEEP:-5}"
 HC_PING_URL="${HC_PING_URL:-}"
+HC_LOG_LINES="${HC_LOG_LINES:-50}"
 
 # --- Logging ---
 log() {
@@ -102,6 +103,7 @@ hc_ping start
 
 failed=0
 summary=""
+failure_logs=""
 total_new=0
 tmpout=$(mktemp)
 trap 'rm -f "$tmpout"' EXIT
@@ -111,6 +113,14 @@ trap 'rm -f "$tmpout"' EXIT
 # the summary line "Downloading ??? original photos and videos to ...").
 count_new_downloads() {
     grep -c 'Downloading /' "$tmpout" 2>/dev/null || true
+}
+
+# Append the last HC_LOG_LINES lines of icloudpd output to failure_logs,
+# so the healthchecks.io fail ping shows what went wrong.
+collect_failure_log() {
+    local label="$1"
+    failure_logs+=$'\n\n'"--- $label: last $HC_LOG_LINES lines of icloudpd output ---"
+    failure_logs+=$'\n'"$(tail -n "$HC_LOG_LINES" "$tmpout")"
 }
 
 # --- Shared library backup ---
@@ -125,6 +135,7 @@ if [[ -n "$SHARED_LIBRARY" ]]; then
         shared_new=$(count_new_downloads)
         log "ERROR: Shared library backup failed (exit code: ${PIPESTATUS[0]}). New photos before failure: $shared_new"
         summary+="Shared library: FAILED ($shared_new new)"
+        collect_failure_log "Shared library"
         failed=$((failed + 1))
     fi
     total_new=$((total_new + shared_new))
@@ -143,6 +154,7 @@ else
     personal_new=$(count_new_downloads)
     log "ERROR: Personal library backup failed (exit code: ${PIPESTATUS[0]}). New photos before failure: $personal_new"
     summary+=", Personal library: FAILED ($personal_new new)"
+    collect_failure_log "Personal library"
     failed=$((failed + 1))
 fi
 total_new=$((total_new + personal_new))
@@ -163,7 +175,7 @@ summary+=$'\n'"Total new photos: $total_new"
 summary+=$'\n'"Most recent photo: $latest_photo_date"
 
 if (( failed > 0 )); then
-    hc_ping fail "$summary"
+    hc_ping fail "$summary$failure_logs"
 else
     hc_ping "" "$summary"
 fi

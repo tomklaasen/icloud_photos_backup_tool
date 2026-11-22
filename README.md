@@ -46,7 +46,7 @@ The summary sent to healthchecks.io includes:
 - Per-library status (OK/FAILED) and count of newly downloaded photos
 - Total new photos across both libraries
 - Date of the most recent photo in the backup (derived from the `YYYY/MM/DD` directory structure)
-- On failure: the last `HC_LOG_LINES` lines of icloudpd output for each failed library
+- On failure: per failed library one line with the exit code and the error (the exception line of the traceback, or else the last line of output), then the last `HC_LOG_LINES` lines of icloudpd output for each failed library
 
 ## Re-authentication
 

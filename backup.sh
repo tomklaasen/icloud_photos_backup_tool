@@ -103,6 +103,7 @@ hc_ping start
 
 failed=0
 summary=""
+errors=""
 failure_logs=""
 total_new=0
 tmpout=$(mktemp)
@@ -115,10 +116,22 @@ count_new_downloads() {
     grep -c 'Downloading /' "$tmpout" 2>/dev/null || true
 }
 
-# Append the last HC_LOG_LINES lines of icloudpd output to failure_logs,
-# so the healthchecks.io fail ping shows what went wrong.
+# Extract the actual error from icloudpd output: the last exception line of a
+# traceback, or else the last non-empty line.
+extract_error_line() {
+    local line
+    line=$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)\b' "$tmpout" | tail -n 1 || true)
+    [[ -z "$line" ]] && line=$(grep -v '^[[:space:]]*$' "$tmpout" | tail -n 1 || true)
+    echo "${line:-(no output)}"
+}
+
+# Record a one-line error per failed library (shown first in the fail ping,
+# because healthchecks.io truncates long bodies) and append the last
+# HC_LOG_LINES lines of icloudpd output to failure_logs.
 collect_failure_log() {
     local label="$1"
+    local rc="$2"
+    errors+=$'\n'"$label error (exit $rc): $(extract_error_line)"
     failure_logs+=$'\n\n'"--- $label: last $HC_LOG_LINES lines of icloudpd output ---"
     failure_logs+=$'\n'"$(tail -n "$HC_LOG_LINES" "$tmpout")"
 }
@@ -136,7 +149,7 @@ if [[ -n "$SHARED_LIBRARY" ]]; then
         shared_new=$(count_new_downloads)
         log "ERROR: Shared library backup failed (exit code: $rc). New photos before failure: $shared_new"
         summary+="Shared library: FAILED ($shared_new new)"
-        collect_failure_log "Shared library"
+        collect_failure_log "Shared library" "$rc"
         failed=$((failed + 1))
     fi
     total_new=$((total_new + shared_new))
@@ -156,7 +169,7 @@ else
     personal_new=$(count_new_downloads)
     log "ERROR: Personal library backup failed (exit code: $rc). New photos before failure: $personal_new"
     summary+=", Personal library: FAILED ($personal_new new)"
-    collect_failure_log "Personal library"
+    collect_failure_log "Personal library" "$rc"
     failed=$((failed + 1))
 fi
 total_new=$((total_new + personal_new))
@@ -177,7 +190,7 @@ summary+=$'\n'"Total new photos: $total_new"
 summary+=$'\n'"Most recent photo: $latest_photo_date"
 
 if (( failed > 0 )); then
-    hc_ping fail "$summary$failure_logs"
+    hc_ping fail "$summary$errors$failure_logs"
 else
     hc_ping "" "$summary"
 fi
